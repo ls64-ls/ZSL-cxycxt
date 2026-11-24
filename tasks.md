@@ -62,6 +62,7 @@
 - [x] T-35 AI 大模型配置（多模型管理）：新增 `llm_model` 表（启动时幂等建表并播种当前 DeepSeek 配置），系统管理新增「AI 大模型配置」页签（左栏模型接入表 + 右栏模型用量卡），支持 SYS_ADMIN 新增/编辑/删除模型与「设为当前」切换；抽取路由按 DB 中当前启用模型动态调用 OpenAI 兼容接口，无可用模型时回退本地规则引擎；接口 `GET/POST /api/v1/ai/llm/models`、`PUT/DELETE /api/v1/ai/llm/models/{id}`、`POST /api/v1/ai/llm/models/{id}/activate`
 - [x] T-36 2027 级专业动态调整建议：curriculum-service 新增 `adjustment_plan_item` 表与 `GET /api/v1/curriculum/adjustments/plan`（按 data-service 真实岗位/技能数据生成 9 条建议并幂等 upsert）、`POST /api/v1/curriculum/adjustments/{id}/adopt`（MAJOR_LEADER/SYS_ADMIN）；前端新增 `/adjustments` 页与侧边栏入口，展示周期、KPI、筛选、建议卡片、建议依据与评审进度
 - [x] T-37 业务规格 v2 评审采纳（2026-11-23）：按 `spec-prompt.md` 结构重写业务规格，覆盖 16 个场景 / 44 条需求 / 33 条验收标准，含术语表、业务不变量与追溯矩阵；状态置为已评审生效并作为唯一事实来源，v1 归档为 `docs/spec-v1.md`；C-01~C-05、TBD-01~TBD-07 作为开放项持续跟踪
+- [x] T-38 技术方案与数据库设计重构（2026-11-24）：按 plan-prompt v3.1 重构 `plan.md`（审查结论、7 项架构决策、领域模型与状态机、API 契约、AC→测试映射、里程碑）；按 db-design-prompt v1.1 编制 `db-design.md`（四库 23 张表、关系/索引/数据字典/生命周期/追溯矩阵，登记 TBD-01~TBD-09）；`data-model.md` 标记为历史版本
 
 ### 验收记录（2026-11-23，本地环境）
 
