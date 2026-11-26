@@ -60,6 +60,7 @@
 | AD-05 | 前端单体 SPA（Vue 3 + TS + Element Plus），按页面拆分视图，不引入微前端 | 页面数量与团队规模不支撑微前端 | 打包体积随页面增长；需按路由懒加载 | 现状 frontend |
 | AD-06 | 年度调整建议采用“请求时实时生成 + 幂等 upsert”，不新增调度器 | 保证数据最新，避免调度与幂等双复杂度 | 每次打开页面有生成开销；并发打开需依赖唯一键兜底 | plan v1 5.4、REQ-31~34 |
 | AD-07 | 大模型接入采用“配置表 + 当前模型路由 + 规则回退” | 支持切换供应商，模型故障时保证基础抽取可用 | 回退结果质量低于模型；必须记录实际模型 | REQ-17~19、REQ-37~40 |
+| AD-08 | AI 辅助能力统一采用“结构化 Prompt + 严格 JSON 校验 + 规则回退”，结果显式标注 `provider/model/fallback` | 三项能力共享当前模型与调用日志，避免各自造轮子；输出必须可校验 | 回退质量低于模型；字段映射必须二次校验字典白名单 | REQ-45~47、AC-AI-06~08 |
 
 ## 2. 领域建模与核心抽象
 
@@ -216,6 +217,8 @@ frontend/src/
 | POST | `/data/jobs/semantic-search` | 语义检索 | query,region,size | total,list | 400/503 |
 | GET | `/data/jobs/{id}/similar` | 相似岗位 | size | 列表 | 404 |
 | GET | `/data/jobs/stats` | 看板统计 | region,skill,timeRange | KPI/趋势/分布/排行 | 400 |
+| GET | `/data/jobs/insights` | 看板增强指标 | region,start,end | AI 岗位占比与结构、新兴技能、重点岗位明细、数据更新时间 | 400 |
+| GET | `/data/jobs/updated-at` | 数据更新时间 | — | 岗位样本最新写入时间 | — |
 | GET | `/data/jobs/skills/heat` | 技能热度 | limit | name,value 列表 | — |
 | GET | `/data/jobs/extraction-progress` | 抽取进度 | — | total/done/pending/percent | — |
 | POST | `/data/jobs/reindex` | 重建索引 | — | indexed | 503 |
@@ -227,6 +230,7 @@ frontend/src/
 | GET | `/data/reports/annual` | 同步报告 | format,year | 文件流 | 400 |
 | GET | `/data/reports/annual/excel` | 同步 Excel | year | 文件流 | 400 |
 | POST | `/data/reports/async` | 创建报告任务 | format,year | taskId,status | 400 |
+| GET | `/data/reports/tasks` | 报告任务分页 | page,size | 分页任务 | — |
 | GET | `/data/reports/async/{taskId}` | 报告进度 | — | 状态/消息 | 404 |
 | GET | `/data/reports/async/{taskId}/download` | 下载报告 | — | 文件流 | 404/409 |
 | POST | `/ai/extract` | 单条抽取 | jobDescription | skills/tools/abilities | 422/502 |
@@ -240,6 +244,9 @@ frontend/src/
 | PUT | `/ai/llm/models/{id}` | 编辑模型 | 同上（Key 可空） | 模型 | 400/403/404 |
 | DELETE | `/ai/llm/models/{id}` | 删除模型 | — | 成功 | 403/404/409 |
 | POST | `/ai/llm/models/{id}/activate` | 设为当前 | — | 模型 | 403/404/409 |
+| POST | `/ai/assist/companies/classify` | 企业行业属性识别 | companies[id,companyName] | items[id,companyName,aiFlag]、provider/model/fallback | 400/502 |
+| POST | `/ai/assist/import/mapping` | 导入表头字段映射 | databaseFields,headers | items[mappingField,fieldKey,fieldValue,matchType,level,status]、provider/model/fallback | 400/502 |
+| POST | `/ai/assist/adjustments/generate` | 生成专业调整建议 | recommendedTypes,notes,jobs,courseSystem | items[recommendedType,level,title,desc,accordingTo]、provider/model/fallback | 400/502 |
 | GET | `/curriculum/courses` | 课程分页 | page,size,keyword | 分页课程 | — |
 | GET | `/curriculum/courses/all` | 课程下拉 | — | 课程列表 | — |
 | GET | `/curriculum/courses/{id}` | 课程详情 | — | 课程/技能点/案例 | 404 |
@@ -308,6 +315,7 @@ frontend/src/
 | 数据库异常 | 回滚事务，返回 500 | 返回空列表冒充成功 |
 | 数据服务不可用（年度建议） | 返回 502 | 生成占位或历史缓存建议 |
 | 大模型不可用（抽取） | 回退规则词典；仍失败则 502 | 返回空数组冒充抽取成功 |
+| 大模型不可用（企业识别/字段映射/建议生成） | 回退规则实现并标注 `fallback=true`；回退也失败则 502 | 返回空结果冒充成功；输出字典外字段编码 |
 | 权限不足 | 403 | 前端隐藏代替服务端校验 |
 | 状态冲突 | 409 | 覆盖式更新终态 |
 | 非法周期/格式 | 422 | 静默保存或停用 |

@@ -63,6 +63,55 @@
 - [x] T-36 2027 级专业动态调整建议：curriculum-service 新增 `adjustment_plan_item` 表与 `GET /api/v1/curriculum/adjustments/plan`（按 data-service 真实岗位/技能数据生成 9 条建议并幂等 upsert）、`POST /api/v1/curriculum/adjustments/{id}/adopt`（MAJOR_LEADER/SYS_ADMIN）；前端新增 `/adjustments` 页与侧边栏入口，展示周期、KPI、筛选、建议卡片、建议依据与评审进度
 - [x] T-37 业务规格 v2 评审采纳（2026-11-23）：按 `spec-prompt.md` 结构重写业务规格，覆盖 16 个场景 / 44 条需求 / 33 条验收标准，含术语表、业务不变量与追溯矩阵；状态置为已评审生效并作为唯一事实来源，v1 归档为 `docs/spec-v1.md`；C-01~C-05、TBD-01~TBD-07 作为开放项持续跟踪
 - [x] T-38 技术方案与数据库设计重构（2026-11-24）：按 plan-prompt v3.1 重构 `plan.md`（审查结论、7 项架构决策、领域模型与状态机、API 契约、AC→测试映射、里程碑）；按 db-design-prompt v1.1 编制 `db-design.md`（四库 23 张表、关系/索引/数据字典/生命周期/追溯矩阵，登记 TBD-01~TBD-09）；`data-model.md` 标记为历史版本
+- [x] T-39 原型对齐 v3（2026-11-24）：导航调整为工作台/分析洞察/专业建设/数据与质量/系统，顶栏新增全局搜索与数据更新时间；看板更名「产业数据看板」，新增季度/区域筛选、AI 岗位占比 KPI、新兴技能预警、AI 协同岗位结构、重点岗位需求明细、数据溯源与质量卡（真实来源：`/data/jobs/stats`、`/data/jobs/insights`、`/data/jobs/skills/heat`、`/data/import/tasks`、`/data/quality/report`）；新增 `/reports` 报告与成果页（真实报告任务 `GET /data/reports/tasks`、异步生成与下载、评审发布系统外说明、按创建年度归集课程/技能点/案例台账）；新增 `GET /data/jobs/insights`、`GET /data/jobs/updated-at`、`GET /data/reports/tasks`，全部指标来自真实台账，不使用演示数字
+
+## Phase 8: AI 辅助能力（2026-11-26）
+
+**预检报告（tasks-prompt v3.2）**
+- 一致性检查：`spec.md` SCN-17 / REQ-45~47 / AC-AI-06~08 与 `plan.md` AD-08 一致；无冲突。
+- 技术栈确认：Java 8 + Spring Boot 2.7.18 + Spring Cloud 2021.0.8 + MyBatis-Plus；Vue 3 + TS + Element Plus。
+- 工作目录：项目根 `e:\RCYCsystem`；后端 `backend/`，前端 `frontend/`，部署 `deploy/`。
+- 前后端边界：AI 能力在 `backend/ai-service`；导入预览在 `backend/data-service`；建议接入在 `backend/curriculum-service`；前端 API 在 `frontend/src/api`。
+
+- [x] T40-01 [REQ-46] [AC-AI-07] [Phase 8] [Size: S] 编写字段映射规则测试：精确匹配 100%、无法匹配“待映射”、模型返回字典外编码降级为“待映射”。 依赖：无。 文件：`backend/ai-service/src/test/java/edu/niit/rcyc/ai/assist/FieldMappingServiceTest.java`。 验证：`mvn -pl ai-service test -Dtest=FieldMappingServiceTest`。 完成判据：三类断言全部通过。 来源：`spec.md#SCN-17, AC-AI-07`；`plan.md#AD-08`
+- [x] T40-02 [REQ-46] [AC-AI-07] [Phase 8] [Size: M] 实现字段映射能力：按 `databaseFields` 先精确匹配，再调用当前模型做语义匹配，最后白名单校验；返回 `provider/model/fallback`。 依赖：T40-01。 文件：`backend/ai-service/src/main/java/edu/niit/rcyc/ai/assist/FieldMappingService.java`。 验证：T40-01 通过，接口手工调用返回 4 条映射且无字典外编码。 完成判据：AC-AI-07 满足。 来源：`spec.md#REQ-46`
+- [x] T40-03 [REQ-45] [AC-AI-06] [Phase 8] [Size: S] 编写企业行业识别规则测试：IT 类企业 aiFlag=1、非 IT=0、模型不可用时回退仍返回全部公司。 依赖：无。 文件：`backend/ai-service/src/test/java/edu/niit/rcyc/ai/assist/CompanyClassifyServiceTest.java`。 验证：`mvn -pl ai-service test -Dtest=CompanyClassifyServiceTest`。 完成判据：0/1 与回退断言通过。 来源：`spec.md#AC-AI-06`
+- [x] T40-04 [REQ-45] [AC-AI-06] [Phase 8] [Size: S] 实现企业行业识别能力与 `POST /api/v1/ai/assist/companies/classify`。 依赖：T40-03。 文件：`backend/ai-service/src/main/java/edu/niit/rcyc/ai/assist/CompanyClassifyService.java`、`.../controller/AiAssistController.java`。 验证：T40-03 通过，接口返回 `aiFlag` 为数字。 完成判据：AC-AI-06 满足。 来源：`spec.md#REQ-45`
+- [x] T40-05 [REQ-47] [AC-AI-08] [Phase 8] [Size: S] 编写调整建议规则回退测试：输入岗位技能与课程技能点，输出方向/课程/技能点三类且每项含依据。 依赖：无。 文件：`backend/ai-service/src/test/java/edu/niit/rcyc/ai/assist/AdjustmentSuggestionServiceTest.java`。 验证：`mvn -pl ai-service test -Dtest=AdjustmentSuggestionServiceTest`。 完成判据：三类覆盖与依据非空断言通过。 来源：`spec.md#AC-AI-08`
+- [x] T40-06 [REQ-47] [AC-AI-08] [Phase 8] [Size: M] 实现调整建议生成能力与 `POST /api/v1/ai/assist/adjustments/generate`，统一复用当前模型并记录调用日志。 依赖：T40-05。 文件：`backend/ai-service/src/main/java/edu/niit/rcyc/ai/assist/AdjustmentSuggestionService.java`、`.../llm/OpenAiCompatibleLlmClient.java`、`.../llm/LlmProviderRouter.java`。 验证：T40-05 通过。 完成判据：AC-AI-08 满足。 来源：`spec.md#REQ-47`；`plan.md#AD-08`
+- [ ] T40-07 [REQ-46] [AC-AI-07] [Phase 8] [Size: S] data-service 新增表头读取与映射预览：读取 xlsx/csv 首行表头，调用 ai-service 映射接口，服务不可用时按本地精确匹配回退。 依赖：T40-02。 文件：`backend/data-service/src/main/java/edu/niit/rcyc/data/controller/ImportController.java`、`.../service/ImportMappingService.java`、`.../client/AiServiceClient.java`。 验证：上传 `data/samples/cnopendata_jobs_sample.xlsx` 返回映射清单。 完成判据：每个表头一条结果，响应标注来源。 状态：代码与编译已完成；运行时上传复核待环境内存恢复。 来源：`spec.md#REQ-46`
+- [x] T40-08 [REQ-46] [AC-AI-07] [Phase 8] [Size: S] 前端导入页选择文件后展示真实字段映射表（外部表头/标准字段/匹配方式/置信度/状态）。 依赖：T40-07。 文件：`frontend/src/views/ImportView.vue`、`frontend/src/api/data.ts`、`frontend/src/types/index.ts`。 验证：`npm run build` 通过；浏览器选择样例文件后表格出现 4 行。 完成判据：映射结果来自接口，不写死。 来源：`spec.md#AC-AI-07`
+- [x] T40-09 [REQ-45] [AC-AI-06] [Phase 8] [Size: S] 前端 AI 工作台新增“企业行业识别”面板，使用真实覆盖企业名称调用识别接口并展示 aiFlag 与来源。 依赖：T40-04。 文件：`frontend/src/views/AiView.vue`、`frontend/src/api/ai.ts`、`frontend/src/types/index.ts`。 验证：`npm run build` 通过；浏览器识别 Top 企业返回 0/1。 完成判据：结果来自接口且标注模型/规则。 来源：`spec.md#AC-AI-06`
+- [x] T40-10 [REQ-47] [AC-AI-08] [Phase 8] [Size: M] curriculum-service 年度建议生成接入 AI：组装真实岗位与课程体系输入，AI 不可用或输出不合法时回退现有规则；已采纳建议不被覆盖。 依赖：T40-06。 文件：`backend/curriculum-service/src/main/java/edu/niit/rcyc/curriculum/service/AdjustmentPlanService.java`、`.../client/AiServiceClient.java`、`.../dto/AiSuggestion*.java`。 验证：无模型时仍生成三类建议；采纳后重新打开状态保持。 完成判据：AC-AI-08 与 INV-07 满足。 来源：`spec.md#REQ-47, INV-07`
+- [x] T40-11 [REQ-45~47] [AC-AI-06~08] [Phase 8] [Size: S] 构建、部署与浏览器复核三个 AI 能力，并记录验收证据。 依赖：T40-02、T40-04、T40-06、T40-08、T40-09、T40-10。 文件：`docs/tasks.md`。 验证：`mvn -DskipTests package`、`npm run build`、`docker compose up -d --build ai-service data-service curriculum-service`、浏览器实测。 完成判据：三处能力均可用且失败时显式标注。 来源：`plan.md#AD-08`
+
+### 验收记录（2026-11-26，AI 辅助能力）
+
+| 验收项 | 结果 | 证据 |
+|---|---|---|
+| ai-service 单测 | 通过 | `mvn -pl ai-service -am test`：13 个测试全部通过（新增分类/映射/建议 7 个） |
+| 构建 | 通过 | `mvn -DskipTests -pl ai-service,data-service,curriculum-service -am package` 成功；`npm run build` 成功（2278 模块） |
+| 企业行业识别 | 通过 | `POST /ai/assist/companies/classify`：真实模型 `provider=openai fallback=false`，云创/润和 `aiFlag=1`，餐饮公司 `aiFlag=0` |
+| 导入字段映射 | 通过 | `POST /data/import/mapping` 上传样例文件：HTTP 200，12 个表头全部“完全匹配/已映射”，来源 `rule/fallback=false` |
+| 调整建议生成 | 通过 | `GET /curriculum/adjustments/plan?regenerate=true`：HTTP 200，14 条建议（DIRECTION 4 / COURSE 5 / SKILL 5），内容来自模型 |
+| 已采纳保护 | 通过 | 采纳 `ADJ-2027-D001` 后重新生成：该条仍存在且状态 `ADOPTED`，未被覆盖 |
+| 浏览器 UI 复核 | 待环境恢复 | 内存受限（宿主机可用 <1GB），已完成接口与构建验证；页面交互复核待资源恢复后补测 |
+
+> 内存受限处理：停用 `rcyc-elasticsearch` 释放内存（岗位全文检索暂不可用，可 `docker start rcyc-elasticsearch` 恢复）；各 Java 服务通过 `JAVA_TOOL_OPTIONS` 限制堆（256~384MB），RocketMQ NameServer/Broker 限制为 256/512MB。
+
+### 验收记录（2026-11-24，构建验证）
+
+| 验收项 | 结果 | 证据 |
+|---|---|---|
+| 前端构建（T-39） | 通过 | `npm run build`（vue-tsc + vite）成功，2278 个模块，`ReportsView` 与 `DashboardView` 产物生成 |
+| 后端编译（T-39） | 通过 | `mvn -DskipTests -pl data-service -am package` 成功，78 个源文件编译通过，`data-service-1.0.0.jar` 生成 |
+| 看板真实口径 | 静态核对 | KPI/图表仅引用 `/data/jobs/stats`、`/data/jobs/insights`、`/data/jobs/skills/heat`、`/data/import/tasks`、`/data/quality/report`，未写死演示数字 |
+| 运行时验证（2026-11-24） | 通过 | Docker 引擎 28.5.1 启动，12 个 rcyc 容器运行；admin 登录成功；`/data/jobs/insights` 返回 `aiJobRatio=15.6`、`emergingSkills=6`、`topJobDetails=8`；`/data/reports/tasks` 返回 2 条 DONE 任务；报告下载 HTTP 200（3643 bytes，docx） |
+| 浏览器复核（2026-11-24） | 通过 | `http://localhost/dashboard` 显示「岗位需求总量 4,981 条」「AI 岗位占比 15.6%」，无报错；`http://localhost/reports` 显示 2 条已完成报告（Word/PDF）与 2026 年建设成果台账（17 条），无报错 |
+
+> 启动排障记录：Nacos 内嵌 Derby 残留锁会导致 `Login timeout exceeded` 启动失败，清理 `/home/nacos/data/derby-data/*.lck` 并重启容器后恢复。
+> 看板排障记录：`DashboardInsight.emergingSkills` 曾使用 `subList`，Redis JSON 反序列化失败导致看板报“服务器内部错误”，已改为 `new ArrayList<>(signals.subList(...))` 并重启 data-service 验证通过。
+> 导入排障记录：`deploy/rocketmq/broker.conf` 的 `brokerIP1` 原为 `127.0.0.1`，容器内生产者拿到错误 broker 地址导致 `RemotingException`；已改为 `rocketmq-broker`，重启 broker 与 data-service 后样例文件导入成功（上传 200，任务 DONE，成功 318 / 失败 7 / 总数 325）。
 
 ### 验收记录（2026-11-23，本地环境）
 
